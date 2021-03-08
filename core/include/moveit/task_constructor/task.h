@@ -42,11 +42,13 @@
 #include "container.h"
 
 #include <moveit/task_constructor/introspection.h>
-#include <moveit_task_constructor_msgs/Solution.h>
+#include <moveit_task_constructor_msgs/msg/solution.hpp>
 
 #include <moveit/macros/class_forward.h>
 
-#include <moveit_msgs/MoveItErrorCodes.h>
+#include <moveit_msgs/msg/move_it_error_codes.hpp>
+
+#include <rclcpp/node.hpp>
 
 namespace moveit {
 namespace core {
@@ -75,7 +77,8 @@ public:
 
 	// +1 TODO: move into MoveIt! core
 	static planning_pipeline::PlanningPipelinePtr
-	createPlanner(const moveit::core::RobotModelConstPtr& model, const std::string& ns = "move_group",
+	createPlanner(const rclcpp::Node::SharedPtr node, const moveit::core::RobotModelConstPtr& model,
+	              const std::string& ns = "move_group",
 	              const std::string& planning_plugin_param_name = "planning_plugin",
 	              const std::string& adapter_plugins_param_name = "request_adapters");
 	Task(const std::string& ns = "", bool introspection = true,
@@ -91,7 +94,7 @@ public:
 	/// setting the robot model also resets the task
 	void setRobotModel(const moveit::core::RobotModelConstPtr& robot_model);
 	/// load robot model from given parameter
-	void loadRobotModel(const std::string& robot_description = "robot_description");
+	void loadRobotModel(const rclcpp::Node::SharedPtr& node, const std::string& robot_description = "robot_description");
 
 	void add(Stage::pointer&& stage);
 	bool insert(Stage::pointer&& stage, int before = -1) override;
@@ -126,7 +129,7 @@ public:
 	/// interrupt current planning (or execution)
 	void preempt();
 	/// execute solution, return the result
-	moveit_msgs::MoveItErrorCodes execute(const SolutionBase& s);
+	moveit_msgs::msg::MoveItErrorCodes execute(const SolutionBase& s);
 
 	/// print current task state (number of found solutions and propagated states) to std::cout
 	void printState(std::ostream& os = std::cout) const;

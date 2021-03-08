@@ -43,7 +43,7 @@
 #include <moveit/task_constructor/cost_terms.h>
 #include <moveit/task_constructor/cost_queue.h>
 
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 
 #include <ostream>
 #include <chrono>
@@ -116,7 +116,7 @@ public:
 	/// enforce only one parent exists
 	inline bool setParent(ContainerBase* parent) {
 		if (parent_) {
-			ROS_ERROR_STREAM("Tried to add stage '" << name() << "' to two parents");
+			RCLCPP_ERROR_STREAM(LOGGER, "Tried to add stage '" << name() << "' to two parents");
 			return false;  // it's not allowed to add a stage to a parent if it already has one
 		}
 		parent_ = parent;
@@ -194,6 +194,7 @@ private:
 	InterfaceWeakPtr next_starts_;  // interface to be used for sendForward()
 
 	Introspection* introspection_;  // task's introspection instance
+	inline static const rclcpp::Logger LOGGER = rclcpp::get_logger("stage_private");
 };
 PIMPL_FUNCTIONS(Stage)
 std::ostream& operator<<(std::ostream& os, const StagePrivate& stage);

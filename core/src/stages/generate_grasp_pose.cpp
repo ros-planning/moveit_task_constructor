@@ -42,11 +42,13 @@
 #include <moveit/planning_scene/planning_scene.h>
 
 #include <Eigen/Geometry>
-#include <eigen_conversions/eigen_msg.h>
+#include <tf2_eigen/tf2_eigen.h>
 
 namespace moveit {
 namespace task_constructor {
 namespace stages {
+
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("GenerateGraspPose");
 
 GenerateGraspPose::GenerateGraspPose(const std::string& name) : GeneratePose(name) {
 	auto& p = properties();
@@ -105,7 +107,7 @@ void GenerateGraspPose::onNewSolution(const SolutionBase& s) {
 			solution.setComment(msg);
 			spawn(std::move(state), std::move(solution));
 		} else
-			ROS_WARN_STREAM_NAMED("GenerateGraspPose", msg);
+			RCLCPP_WARN_STREAM(LOGGER, msg);
 		return;
 	}
 
@@ -122,10 +124,10 @@ void GenerateGraspPose::compute() {
 	const std::string& eef = props.get<std::string>("eef");
 	const moveit::core::JointModelGroup* jmg = scene->getRobotModel()->getEndEffector(eef);
 
-	robot_state::RobotState& robot_state = scene->getCurrentStateNonConst();
+	moveit::core::RobotState& robot_state = scene->getCurrentStateNonConst();
 	robot_state.setToDefaultValues(jmg, props.get<std::string>("pregrasp"));
 
-	geometry_msgs::PoseStamped target_pose_msg;
+	geometry_msgs::msg::PoseStamped target_pose_msg;
 	target_pose_msg.header.frame_id = props.get<std::string>("object");
 
 	double current_angle = 0.0;
@@ -135,7 +137,7 @@ void GenerateGraspPose::compute() {
 		current_angle += props.get<double>("angle_delta");
 
 		InterfaceState state(scene);
-		tf::poseEigenToMsg(target_pose, target_pose_msg.pose);
+		tf2::convert(target_pose, target_pose_msg.pose);
 		state.properties().set("target_pose", target_pose_msg);
 		props.exposeTo(state.properties(), { "pregrasp", "grasp" });
 
