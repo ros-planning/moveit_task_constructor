@@ -82,12 +82,14 @@ void PickPlaceTask::loadParameters() {
 	rosparam_shortcuts::shutdownIfError(LOGNAME, errors);
 }
 
+// The init function declares all movements for the pick-and-place task. These movements are described below.
 void PickPlaceTask::init() {
 	ROS_INFO_NAMED(LOGNAME, "Initializing task pipeline");
 	const std::string object = object_name_;
 
 	// Reset ROS introspection before constructing the new object
 	// TODO(henningkayser): verify this is a bug, fix if possible
+	// Movements are collected inside a Task object.
 	task_.reset();
 	task_.reset(new moveit::task_constructor::Task());
 
@@ -95,7 +97,7 @@ void PickPlaceTask::init() {
 	t.stages()->setName(task_name_);
 	t.loadRobotModel();
 
-	// Sampling planner
+	// Different planners plan robot movement: a cartesian , pipeline, or joint interpolation planner.
 	auto sampling_planner = std::make_shared<solvers::PipelinePlanner>();
 	sampling_planner->setProperty("goal_joint_tolerance", 1e-5);
 
@@ -117,6 +119,7 @@ void PickPlaceTask::init() {
 	 *               Current State                      *
 	 *                                                  *
 	 ***************************************************/
+	// First, verify that the object is not already attached to the robot.
 	Stage* current_state_ptr = nullptr;  // Forward current_state on to grasp pose generator
 	{
 		auto current_state = std::make_unique<stages::CurrentState>("current state");
@@ -153,7 +156,8 @@ void PickPlaceTask::init() {
 	 *               Move to Pick                       *
 	 *                                                  *
 	 ***************************************************/
-	{  // Move-to pre-grasp
+	// Move to a pre-grasp pose. The Connect stage does not declare any movements but connects two stages that do.
+	{
 		auto stage = std::make_unique<stages::Connect>(
 		    "move to pick", stages::Connect::GroupPlannerVector{ { arm_group_name_, sampling_planner } });
 		stage->setTimeout(5.0);
@@ -168,6 +172,7 @@ void PickPlaceTask::init() {
 	 ***************************************************/
 	Stage* attach_object_stage = nullptr;  // Forward attach_object_stage to place pose generator
 	{
+		// A SerialContainer combines subordinate tasks to pick the object.
 		auto grasp = std::make_unique<SerialContainer>("pick object");
 		t.properties().exposeTo(grasp->properties(), { "eef", "hand", "group", "ik_frame" });
 		grasp->properties().configureInitFrom(Stage::PARENT, { "eef", "hand", "group", "ik_frame" });
@@ -175,7 +180,9 @@ void PickPlaceTask::init() {
 		/****************************************************
   ---- *               Approach Object                    *
 		 ***************************************************/
+		// Subordinate tasks for the SerialContainer are described below:
 		{
+			// The arm moves along the z-dimension and stops right before the object.
 			auto stage = std::make_unique<stages::MoveRelative>("approach object", cartesian_planner);
 			stage->properties().set("marker_ns", "approach_object");
 			stage->properties().set("link", hand_frame_);
@@ -194,16 +201,17 @@ void PickPlaceTask::init() {
   ---- *               Generate Grasp Pose                *
 		 ***************************************************/
 		{
-			// Sample grasp pose
+			// Sample grasp pose candidates in angle increments around the z-axis of the object.
 			auto stage = std::make_unique<stages::GenerateGraspPose>("generate grasp pose");
 			stage->properties().configureInitFrom(Stage::PARENT);
 			stage->properties().set("marker_ns", "grasp_pose");
 			stage->setPreGraspPose(hand_open_pose_);
 			stage->setObject(object);
-			stage->setAngleDelta(M_PI / 12);
+			stage->setAngleDelta(M_PI / 4);
 			stage->setMonitoredStage(current_state_ptr);  // Hook into current state
 
-			// Compute IK
+			// Compute joint parameters for a target frame of the end effector. Each target frame equals a grasp pose
+			// from the previous stage times the inverse of the user-defined grasp_frame_tansform.
 			auto wrapper = std::make_unique<stages::ComputeIK>("grasp pose IK", std::move(stage));
 			wrapper->setMaxIKSolutions(8);
 			wrapper->setMinSolutionDistance(1.0);
@@ -217,6 +225,7 @@ void PickPlaceTask::init() {
   ---- *               Allow Collision (hand object)   *
 		 ***************************************************/
 		{
+			// Modify the planning scene (does not alter the robot's position) to permit picking up the object.
 			auto stage = std::make_unique<stages::ModifyPlanningScene>("allow collision (hand,object)");
 			stage->allowCollisions(
 			    object, t.getRobotModel()->getJointModelGroup(hand_group_name_)->getLinkModelNamesWithCollisionGeometry(),
@@ -237,6 +246,8 @@ void PickPlaceTask::init() {
 		/****************************************************
   .... *               Attach Object                      *
 		 ***************************************************/
+		// Attaching the object to the hand and lifting the object while guaranteeing that it does not touch the
+		// ground happens in the next four stages.
 		{
 			auto stage = std::make_unique<stages::ModifyPlanningScene>("attach object");
 			stage->attachObject(object, hand_frame_);
@@ -290,6 +301,7 @@ void PickPlaceTask::init() {
 	 *                                                    *
 	 *****************************************************/
 	{
+		// Fourth, define the `move to place` (as the `move to pick`) stage as a Connect object.
 		auto stage = std::make_unique<stages::Connect>(
 		    "move to place", stages::Connect::GroupPlannerVector{ { arm_group_name_, sampling_planner } });
 		stage->setTimeout(5.0);
@@ -302,6 +314,8 @@ void PickPlaceTask::init() {
 	 *          Place Object                              *
 	 *                                                    *
 	 *****************************************************/
+	// Fifth, placing the object is defined as a SerialContainer. The process is similar to picking the object and thus
+	// not illustrated.
 	{
 		auto place = std::make_unique<SerialContainer>("place object");
 		t.properties().exposeTo(place->properties(), { "eef", "hand", "group" });
