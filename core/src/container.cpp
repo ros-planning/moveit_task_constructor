@@ -39,7 +39,7 @@
 #include <moveit/task_constructor/merge.h>
 #include <moveit/planning_scene/planning_scene.h>
 
-#include <ros/console.h>
+#include <rclcpp/logging.hpp>
 
 #include <memory>
 #include <iostream>
@@ -189,7 +189,7 @@ void ContainerBase::add(Stage::pointer&& stage) {
 
 bool ContainerBase::insert(Stage::pointer&& stage, int before) {
 	if (!stage) {
-		ROS_ERROR_STREAM(name() << ": received invalid stage pointer");
+		RCLCPP_ERROR_STREAM(rclcpp::get_logger("ContainerBase"), name() << ": reveived invalid stage pointer");
 		return false;
 	}
 
@@ -517,7 +517,7 @@ void SerialContainer::compute() {
 			if (!stage->pimpl()->canCompute())
 				continue;
 
-			ROS_DEBUG("Computing stage '%s'", stage->name().c_str());
+			RCLCPP_DEBUG(rclcpp::get_logger("SerialContainer"), "Computing stage '%s'", stage->name().c_str());
 			stage->pimpl()->runCompute();
 		} catch (const Property::error& e) {
 			stage->reportPropertyError(e);
@@ -791,7 +791,7 @@ void Merger::onNewSolution(const SolutionBase& s) {
 void MergerPrivate::onNewPropagateSolution(const SolutionBase& s) {
 	const SubTrajectory* trajectory = dynamic_cast<const SubTrajectory*>(&s);
 	if (!trajectory || !trajectory->trajectory()) {
-		ROS_ERROR_NAMED("Merger", "Only simple, valid trajectories are supported");
+      RCLCPP_ERROR(rclcpp::get_logger("Merger"), "Only simple, valid trajectories are supported");
 		return;
 	}
 

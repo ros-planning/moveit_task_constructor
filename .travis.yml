@@ -12,17 +12,16 @@ notifications:
 
 env:
   global:
-    - DOCKER_IMAGE=moveit/moveit:melodic-source
-    - UPSTREAM_WORKSPACE=.rosinstall
+    - DOCKER_IMAGE=moveit/moveit2:foxy-source
+    - UPSTREAM_WORKSPACE=.repos
 
 jobs:
   - env: TEST=clang-format
   - env: TEST=code-coverage
   - compiler: clang
-    env: DOCKER_IMAGE=moveit/moveit:master-source
 
 before_script:
-  - git clone -q --depth=1 https://github.com/ros-planning/moveit_ci.git .moveit_ci
+  - git clone -q -b ros2 --depth=1 https://github.com/ros-planning/moveit_ci.git .moveit_ci
 
 script:
   - .moveit_ci/travis.sh

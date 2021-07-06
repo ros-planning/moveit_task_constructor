@@ -39,21 +39,21 @@
 #pragma once
 
 #include <moveit/macros/class_forward.h>
-#include <moveit_msgs/Constraints.h>
+#include <moveit_msgs/msg/constraints.hpp>
 #include <moveit/task_constructor/properties.h>
 #include <Eigen/Geometry>
 
 namespace planning_scene {
-MOVEIT_CLASS_FORWARD(PlanningScene)
+MOVEIT_CLASS_FORWARD(PlanningScene);
 }
 namespace robot_trajectory {
-MOVEIT_CLASS_FORWARD(RobotTrajectory)
+MOVEIT_CLASS_FORWARD(RobotTrajectory);
 }
 namespace moveit {
 namespace core {
-MOVEIT_CLASS_FORWARD(LinkModel)
-MOVEIT_CLASS_FORWARD(RobotModel)
-MOVEIT_CLASS_FORWARD(JointModelGroup)
+MOVEIT_CLASS_FORWARD(LinkModel);
+MOVEIT_CLASS_FORWARD(RobotModel);
+MOVEIT_CLASS_FORWARD(JointModelGroup);
 }  // namespace core
 }  // namespace moveit
 
@@ -61,7 +61,7 @@ namespace moveit {
 namespace task_constructor {
 namespace solvers {
 
-MOVEIT_CLASS_FORWARD(PlannerInterface)
+MOVEIT_CLASS_FORWARD(PlannerInterface);
 class PlannerInterface
 {
 	// these properties take precedence over stage properties
@@ -82,13 +82,13 @@ public:
 	virtual bool plan(const planning_scene::PlanningSceneConstPtr& from, const planning_scene::PlanningSceneConstPtr& to,
 	                  const moveit::core::JointModelGroup* jmg, double timeout,
 	                  robot_trajectory::RobotTrajectoryPtr& result,
-	                  const moveit_msgs::Constraints& path_constraints = moveit_msgs::Constraints()) = 0;
+	                  const moveit_msgs::msg::Constraints& path_constraints = moveit_msgs::msg::Constraints()) = 0;
 
 	/// plan trajectory from current robot state to Cartesian target
 	virtual bool plan(const planning_scene::PlanningSceneConstPtr& from, const moveit::core::LinkModel& link,
 	                  const Eigen::Isometry3d& target, const moveit::core::JointModelGroup* jmg, double timeout,
 	                  robot_trajectory::RobotTrajectoryPtr& result,
-	                  const moveit_msgs::Constraints& path_constraints = moveit_msgs::Constraints()) = 0;
+	                  const moveit_msgs::msg::Constraints& path_constraints = moveit_msgs::msg::Constraints()) = 0;
 };
 }  // namespace solvers
 }  // namespace task_constructor

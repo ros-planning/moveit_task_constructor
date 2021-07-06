@@ -41,12 +41,14 @@
 
 #include <moveit/planning_scene/planning_scene.h>
 #include <rviz_marker_tools/marker_creation.h>
-#include <eigen_conversions/eigen_msg.h>
+#include <tf2_eigen/tf2_eigen.h>
 #include <moveit/robot_state/conversions.h>
 
 namespace moveit {
 namespace task_constructor {
 namespace stages {
+
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("MoveTo");
 
 MoveTo::MoveTo(const std::string& name, const solvers::PlannerInterfacePtr& planner)
   : PropagatingEitherWay(name), planner_(planner) {
@@ -55,27 +57,27 @@ MoveTo::MoveTo(const std::string& name, const solvers::PlannerInterfacePtr& plan
 	auto& p = properties();
 	p.property("timeout").setDefaultValue(1.0);
 	p.declare<std::string>("group", "name of planning group");
-	p.declare<geometry_msgs::PoseStamped>("ik_frame", "frame to be moved towards goal pose");
+	p.declare<geometry_msgs::msg::PoseStamped>("ik_frame", "frame to be moved towards goal pose");
 	p.declare<boost::any>("goal", "goal specification");
 	// register actual types
 	PropertySerializer<std::string>();
-	PropertySerializer<moveit_msgs::RobotState>();
-	PropertySerializer<geometry_msgs::PointStamped>();
-	PropertySerializer<geometry_msgs::PoseStamped>();
+	PropertySerializer<moveit_msgs::msg::RobotState>();
+	PropertySerializer<geometry_msgs::msg::PointStamped>();
+	PropertySerializer<geometry_msgs::msg::PoseStamped>();
 
-	p.declare<moveit_msgs::Constraints>("path_constraints", moveit_msgs::Constraints(),
-	                                    "constraints to maintain during trajectory");
+	p.declare<moveit_msgs::msg::Constraints>("path_constraints", moveit_msgs::msg::Constraints(),
+	                                         "constraints to maintain during trajectory");
 }
 
 void MoveTo::setIKFrame(const Eigen::Isometry3d& pose, const std::string& link) {
-	geometry_msgs::PoseStamped pose_msg;
+	geometry_msgs::msg::PoseStamped pose_msg;
 	pose_msg.header.frame_id = link;
-	tf::poseEigenToMsg(pose, pose_msg.pose);
+	tf2::convert(pose, pose_msg.pose);
 	setIKFrame(pose_msg);
 }
 
 void MoveTo::setGoal(const std::map<std::string, double>& joints) {
-	moveit_msgs::RobotState robot_state;
+	moveit_msgs::msg::RobotState robot_state;
 	robot_state.joint_state.name.reserve(joints.size());
 	robot_state.joint_state.position.reserve(joints.size());
 
@@ -106,7 +108,7 @@ bool MoveTo::getJointStateGoal(const boost::any& goal, const moveit::core::Joint
 
 	try {
 		// try RobotState
-		const moveit_msgs::RobotState& msg = boost::any_cast<moveit_msgs::RobotState>(goal);
+		const moveit_msgs::msg::RobotState& msg = boost::any_cast<moveit_msgs::msg::RobotState>(goal);
 		if (!msg.is_diff)
 			throw InitStageException(*this, "Expecting a diff state");
 
@@ -141,12 +143,12 @@ bool MoveTo::getJointStateGoal(const boost::any& goal, const moveit::core::Joint
 	return false;
 }
 
-bool MoveTo::getPoseGoal(const boost::any& goal, const geometry_msgs::PoseStamped& ik_pose_msg,
+bool MoveTo::getPoseGoal(const boost::any& goal, const geometry_msgs::msg::PoseStamped& ik_pose_msg,
                          const planning_scene::PlanningScenePtr& scene, Eigen::Isometry3d& target_eigen,
                          decltype(std::declval<SolutionBase>().markers())& markers) {
 	try {
-		const geometry_msgs::PoseStamped& target = boost::any_cast<geometry_msgs::PoseStamped>(goal);
-		tf::poseMsgToEigen(target.pose, target_eigen);
+		const geometry_msgs::msg::PoseStamped& target = boost::any_cast<geometry_msgs::msg::PoseStamped>(goal);
+		tf2::convert(target.pose, target_eigen);
 
 		// transform target into global frame
 		const Eigen::Isometry3d& frame = scene->getFrameTransform(target.header.frame_id);
@@ -167,9 +169,9 @@ bool MoveTo::getPointGoal(const boost::any& goal, const moveit::core::LinkModel*
                           const planning_scene::PlanningScenePtr& scene, Eigen::Isometry3d& target_eigen,
                           decltype(std::declval<SolutionBase>().markers())& /*unused*/) {
 	try {
-		const geometry_msgs::PointStamped& target = boost::any_cast<geometry_msgs::PointStamped>(goal);
+		const geometry_msgs::msg::PointStamped& target = boost::any_cast<geometry_msgs::msg::PointStamped>(goal);
 		Eigen::Vector3d target_point;
-		tf::pointMsgToEigen(target.point, target_point);
+		tf2::convert(target.point, target_point);
 
 		// transform target into global frame
 		const Eigen::Isometry3d& frame = scene->getFrameTransform(target.header.frame_id);
@@ -189,7 +191,7 @@ bool MoveTo::getPointGoal(const boost::any& goal, const moveit::core::LinkModel*
 bool MoveTo::compute(const InterfaceState& state, planning_scene::PlanningScenePtr& scene, SubTrajectory& solution,
                      Direction dir) {
 	scene = state.scene()->diff();
-	const robot_model::RobotModelConstPtr& robot_model = scene->getRobotModel();
+	const moveit::core::RobotModelConstPtr& robot_model = scene->getRobotModel();
 	assert(robot_model);
 
 	const auto& props = properties();
@@ -197,16 +199,16 @@ bool MoveTo::compute(const InterfaceState& state, planning_scene::PlanningSceneP
 	const std::string& group = props.get<std::string>("group");
 	const moveit::core::JointModelGroup* jmg = robot_model->getJointModelGroup(group);
 	if (!jmg) {
-		ROS_WARN_STREAM_NAMED("MoveTo", "Invalid joint model group: " << group);
+		RCLCPP_WARN_STREAM(LOGGER, "Invalid joint model group: " << group);
 		return false;
 	}
 	boost::any goal = props.get("goal");
 	if (goal.empty()) {
-		ROS_WARN_NAMED("MoveTo", "goal undefined");
+		RCLCPP_WARN(LOGGER, "goal undefined");
 		return false;
 	}
 
-	const auto& path_constraints = props.get<moveit_msgs::Constraints>("path_constraints");
+	const auto& path_constraints = props.get<moveit_msgs::msg::Constraints>("path_constraints");
 	robot_trajectory::RobotTrajectoryPtr robot_trajectory;
 	bool success = false;
 
@@ -218,33 +220,33 @@ bool MoveTo::compute(const InterfaceState& state, planning_scene::PlanningSceneP
 		Eigen::Isometry3d target_eigen;
 
 		// Cartesian targets require an IK reference frame
-		geometry_msgs::PoseStamped ik_pose_msg;
+		geometry_msgs::msg::PoseStamped ik_pose_msg;
 		const boost::any& value = props.get("ik_frame");
 		if (value.empty()) {  // property undefined
 			// determine IK link from group
 			if (!(link = jmg->getOnlyOneEndEffectorTip())) {
-				ROS_WARN_STREAM_NAMED("MoveTo", "Failed to derive IK target link");
+				RCLCPP_WARN_STREAM(LOGGER, "Failed to derive IK target link");
 				return false;
 			}
 			ik_pose_msg.header.frame_id = link->getName();
 			ik_pose_msg.pose.orientation.w = 1.0;
 		} else {
-			ik_pose_msg = boost::any_cast<geometry_msgs::PoseStamped>(value);
+			ik_pose_msg = boost::any_cast<geometry_msgs::msg::PoseStamped>(value);
 			if (!(link = robot_model->getLinkModel(ik_pose_msg.header.frame_id))) {
-				ROS_WARN_STREAM_NAMED("MoveTo", "Unknown link: " << ik_pose_msg.header.frame_id);
+				RCLCPP_WARN_STREAM(LOGGER, "Unknown link: " << ik_pose_msg.header.frame_id);
 				return false;
 			}
 		}
 
 		if (!getPoseGoal(goal, ik_pose_msg, scene, target_eigen, solution.markers()) &&
 		    !getPointGoal(goal, link, scene, target_eigen, solution.markers())) {
-			ROS_ERROR_STREAM_NAMED("MoveTo", "Invalid type for goal: " << goal.type().name());
+			RCLCPP_ERROR_STREAM(LOGGER, "Invalid type for goal: " << goal.type().name());
 			return false;
 		}
 
 		// transform target pose such that ik frame will reach there if link does
 		Eigen::Isometry3d ik_pose;
-		tf::poseMsgToEigen(ik_pose_msg.pose, ik_pose);
+		tf2::convert(ik_pose_msg.pose, ik_pose);
 		target_eigen = target_eigen * ik_pose.inverse();
 
 		// plan to Cartesian target

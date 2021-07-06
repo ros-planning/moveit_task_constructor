@@ -41,11 +41,11 @@
 #include <moveit/task_constructor/stage.h>
 #include <moveit/task_constructor/solvers/planner_interface.h>
 
-#include <moveit_msgs/Constraints.h>
+#include <moveit_msgs/msg/constraints.hpp>
 
 namespace moveit {
 namespace core {
-MOVEIT_CLASS_FORWARD(RobotState)
+MOVEIT_CLASS_FORWARD(RobotState);
 }
 }  // namespace moveit
 
@@ -76,7 +76,7 @@ public:
 	using GroupPlannerVector = std::vector<std::pair<std::string, solvers::PlannerInterfacePtr> >;
 	Connect(const std::string& name = "connect", const GroupPlannerVector& planners = {});
 
-	void setPathConstraints(moveit_msgs::Constraints path_constraints) {
+	void setPathConstraints(moveit_msgs::msg::Constraints path_constraints) {
 		setProperty("path_constraints", std::move(path_constraints));
 	}
 

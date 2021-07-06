@@ -41,11 +41,13 @@
 
 #include <moveit/planning_scene/planning_scene.h>
 #include <rviz_marker_tools/marker_creation.h>
-#include <eigen_conversions/eigen_msg.h>
+#include <tf2_eigen/tf2_eigen.h>
 
 namespace moveit {
 namespace task_constructor {
 namespace stages {
+
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("MoveRelative");
 
 MoveRelative::MoveRelative(const std::string& name, const solvers::PlannerInterfacePtr& planner)
   : PropagatingEitherWay(name), planner_(planner) {
@@ -54,23 +56,23 @@ MoveRelative::MoveRelative(const std::string& name, const solvers::PlannerInterf
 	auto& p = properties();
 	p.property("timeout").setDefaultValue(1.0);
 	p.declare<std::string>("group", "name of planning group");
-	p.declare<geometry_msgs::PoseStamped>("ik_frame", "frame to be moved in Cartesian direction");
+	p.declare<geometry_msgs::msg::PoseStamped>("ik_frame", "frame to be moved in Cartesian direction");
 
 	p.declare<boost::any>("direction", "motion specification");
 	// register actual types
-	PropertySerializer<geometry_msgs::TwistStamped>();
-	PropertySerializer<geometry_msgs::Vector3Stamped>();
+	PropertySerializer<geometry_msgs::msg::TwistStamped>();
+	PropertySerializer<geometry_msgs::msg::Vector3Stamped>();
 	p.declare<double>("min_distance", -1.0, "minimum distance to move");
 	p.declare<double>("max_distance", 0.0, "maximum distance to move");
 
-	p.declare<moveit_msgs::Constraints>("path_constraints", moveit_msgs::Constraints(),
-	                                    "constraints to maintain during trajectory");
+	p.declare<moveit_msgs::msg::Constraints>("path_constraints", moveit_msgs::msg::Constraints(),
+	                                         "constraints to maintain during trajectory");
 }
 
 void MoveRelative::setIKFrame(const Eigen::Isometry3d& pose, const std::string& link) {
-	geometry_msgs::PoseStamped pose_msg;
+	geometry_msgs::msg::PoseStamped pose_msg;
 	pose_msg.header.frame_id = link;
-	tf::poseEigenToMsg(pose, pose_msg.pose);
+	tf2::convert(pose, pose_msg.pose);
 	setIKFrame(pose_msg);
 }
 
@@ -107,7 +109,7 @@ static bool getJointStateFromOffset(const boost::any& direction, const moveit::c
 bool MoveRelative::compute(const InterfaceState& state, planning_scene::PlanningScenePtr& scene,
                            SubTrajectory& solution, Direction dir) {
 	scene = state.scene()->diff();
-	const robot_model::RobotModelConstPtr& robot_model = scene->getRobotModel();
+	const moveit::core::RobotModelConstPtr& robot_model = scene->getRobotModel();
 	assert(robot_model);
 
 	const auto& props = properties();
@@ -115,18 +117,18 @@ bool MoveRelative::compute(const InterfaceState& state, planning_scene::Planning
 	const std::string& group = props.get<std::string>("group");
 	const moveit::core::JointModelGroup* jmg = robot_model->getJointModelGroup(group);
 	if (!jmg) {
-		ROS_WARN_STREAM_NAMED("MoveRelative", "Invalid joint model group: " << group);
+		RCLCPP_WARN_STREAM(LOGGER, "Invalid joint model group: " << group);
 		return false;
 	}
 	boost::any direction = props.get("direction");
 	if (direction.empty()) {
-		ROS_WARN_NAMED("MoveRelative", "direction undefined");
+		RCLCPP_WARN(LOGGER, "direction undefined");
 		return false;
 	}
 
 	double max_distance = props.get<double>("max_distance");
 	double min_distance = props.get<double>("min_distance");
-	const auto& path_constraints = props.get<moveit_msgs::Constraints>("path_constraints");
+	const auto& path_constraints = props.get<moveit_msgs::msg::Constraints>("path_constraints");
 
 	robot_trajectory::RobotTrajectoryPtr robot_trajectory;
 	bool success = false;
@@ -136,21 +138,21 @@ bool MoveRelative::compute(const InterfaceState& state, planning_scene::Planning
 		success = planner_->plan(state.scene(), scene, jmg, timeout, robot_trajectory, path_constraints);
 	} else {
 		// Cartesian targets require an IK reference frame
-		geometry_msgs::PoseStamped ik_pose_msg;
+		geometry_msgs::msg::PoseStamped ik_pose_msg;
 		const moveit::core::LinkModel* link;
 		const boost::any& value = props.get("ik_frame");
 		if (value.empty()) {  // property undefined
 			//  determine IK link from group
 			if (!(link = jmg->getOnlyOneEndEffectorTip())) {
-				ROS_WARN_STREAM_NAMED("MoveRelative", "Failed to derive IK target link");
+				RCLCPP_WARN_STREAM(LOGGER, "Failed to derive IK target link");
 				return false;
 			}
 			ik_pose_msg.header.frame_id = link->getName();
 			ik_pose_msg.pose.orientation.w = 1.0;
 		} else {
-			ik_pose_msg = boost::any_cast<geometry_msgs::PoseStamped>(value);
+			ik_pose_msg = boost::any_cast<geometry_msgs::msg::PoseStamped>(value);
 			if (!(link = robot_model->getLinkModel(ik_pose_msg.header.frame_id))) {
-				ROS_WARN_STREAM_NAMED("MoveRelative", "Unknown link: " << ik_pose_msg.header.frame_id);
+				RCLCPP_WARN_STREAM(LOGGER, "Unknown link: " << ik_pose_msg.header.frame_id);
 				return false;
 			}
 		}
@@ -165,10 +167,10 @@ bool MoveRelative::compute(const InterfaceState& state, planning_scene::Planning
 		    scene->getCurrentState().getGlobalLinkTransform(link);  // take a copy here, pose will change on success
 
 		try {  // try to extract Twist
-			const geometry_msgs::TwistStamped& target = boost::any_cast<geometry_msgs::TwistStamped>(direction);
+			const geometry_msgs::msg::TwistStamped& target = boost::any_cast<geometry_msgs::msg::TwistStamped>(direction);
 			const Eigen::Isometry3d& frame_pose = scene->getFrameTransform(target.header.frame_id);
-			tf::vectorMsgToEigen(target.twist.linear, linear);
-			tf::vectorMsgToEigen(target.twist.angular, angular);
+			tf2::fromMsg(target.twist.linear, linear);
+			tf2::fromMsg(target.twist.angular, angular);
 
 			linear_norm = linear.norm();
 			angular_norm = angular.norm();
@@ -208,9 +210,10 @@ bool MoveRelative::compute(const InterfaceState& state, planning_scene::Planning
 		}
 
 		try {  // try to extract Vector
-			const geometry_msgs::Vector3Stamped& target = boost::any_cast<geometry_msgs::Vector3Stamped>(direction);
+			const geometry_msgs::msg::Vector3Stamped& target =
+			    boost::any_cast<geometry_msgs::msg::Vector3Stamped>(direction);
 			const Eigen::Isometry3d& frame_pose = scene->getFrameTransform(target.header.frame_id);
-			tf::vectorMsgToEigen(target.vector, linear);
+			tf2::fromMsg(target.vector, linear);
 
 			// use max distance?
 			if (max_distance > 0.0) {
@@ -228,14 +231,14 @@ bool MoveRelative::compute(const InterfaceState& state, planning_scene::Planning
 			target_eigen = link_pose;
 			target_eigen.translation() += linear;
 		} catch (const boost::bad_any_cast&) {
-			ROS_ERROR_STREAM_NAMED("MoveRelative", "Invalid type for direction: " << direction.type().name());
+			RCLCPP_ERROR_STREAM(LOGGER, "Invalid type for direction: " << direction.type().name());
 			return false;
 		}
 
 	COMPUTE:
 		// transform target pose such that ik frame will reach there if link does
 		Eigen::Isometry3d ik_pose;
-		tf::poseMsgToEigen(ik_pose_msg.pose, ik_pose);
+		tf2::convert(ik_pose_msg.pose, ik_pose);
 		target_eigen = target_eigen * ik_pose.inverse();
 
 		success = planner_->plan(state.scene(), *link, target_eigen, jmg, timeout, robot_trajectory, path_constraints);
@@ -244,7 +247,7 @@ bool MoveRelative::compute(const InterfaceState& state, planning_scene::Planning
 		if (min_distance > 0.0) {
 			double distance = 0.0;
 			if (robot_trajectory && robot_trajectory->getWayPointCount() > 0) {
-				robot_state::RobotStatePtr& reached_state = robot_trajectory->getLastWayPointPtr();
+				moveit::core::RobotStatePtr& reached_state = robot_trajectory->getLastWayPointPtr();
 				reached_state->updateLinkTransforms();
 				const Eigen::Isometry3d& reached_pose = reached_state->getGlobalLinkTransform(link);
 				if (use_rotation_distance) {
@@ -265,7 +268,7 @@ bool MoveRelative::compute(const InterfaceState& state, planning_scene::Planning
 			solution.setComment("failed to move full distance");
 
 		// add an arrow marker
-		visualization_msgs::Marker m;
+		visualization_msgs::msg::Marker m;
 		m.ns = props.get<std::string>("marker_ns");
 		if (!m.ns.empty()) {
 			m.header.frame_id = scene->getPlanningFrame();
@@ -281,8 +284,8 @@ bool MoveRelative::compute(const InterfaceState& state, planning_scene::Planning
 					// arrow tip at goal pose
 					pos += quat * Eigen::Vector3d(-linear_norm, 0, 0);
 				}
-				tf::pointEigenToMsg(pos, m.pose.position);
-				tf::quaternionEigenToMsg(quat, m.pose.orientation);
+				tf2::convert(pos, m.pose.position);
+				tf2::convert(quat, m.pose.orientation);
 				solution.markers().push_back(m);
 			}
 		}

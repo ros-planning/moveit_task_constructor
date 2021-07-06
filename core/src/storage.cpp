@@ -46,6 +46,8 @@
 namespace moveit {
 namespace task_constructor {
 
+static const rclcpp::Logger LOGGER = rclcpp::get_logger("InterfaceState");
+
 planning_scene::PlanningSceneConstPtr ensureUpdated(const planning_scene::PlanningScenePtr& scene) {
 	// ensure scene's state is updated
 	if (scene->getCurrentState().dirty())
@@ -58,7 +60,7 @@ InterfaceState::InterfaceState(const planning_scene::PlanningScenePtr& ps) : Int
 InterfaceState::InterfaceState(const planning_scene::PlanningSceneConstPtr& ps)
   : scene_(ps), priority_(Priority(0, 0.0)) {
 	if (scene_->getCurrentState().dirty())
-		ROS_ERROR_NAMED("InterfaceState", "Dirty PlanningScene! Please only forward clean ones into InterfaceState.");
+		RCLCPP_ERROR(LOGGER, "Dirty PlanningScene! Please only forward clean ones into InterfaceState.");
 }
 
 InterfaceState::InterfaceState(const planning_scene::PlanningSceneConstPtr& ps, const Priority& p)
@@ -145,7 +147,7 @@ void SolutionBase::setCost(double cost) {
 	cost_ = cost;
 }
 
-void SolutionBase::fillInfo(moveit_task_constructor_msgs::SolutionInfo& info, Introspection* introspection) const {
+void SolutionBase::fillInfo(moveit_task_constructor_msgs::msg::SolutionInfo& info, Introspection* introspection) const {
 	info.id = introspection ? introspection->solutionId(*this) : 0;
 	info.cost = this->cost();
 	info.comment = this->comment();
@@ -157,9 +159,9 @@ void SolutionBase::fillInfo(moveit_task_constructor_msgs::SolutionInfo& info, In
 	std::copy(markers.begin(), markers.end(), info.markers.begin());
 }
 
-void SubTrajectory::fillMessage(moveit_task_constructor_msgs::Solution& msg, Introspection* introspection) const {
+void SubTrajectory::fillMessage(moveit_task_constructor_msgs::msg::Solution& msg, Introspection* introspection) const {
 	msg.sub_trajectory.emplace_back();
-	moveit_task_constructor_msgs::SubTrajectory& t = msg.sub_trajectory.back();
+	moveit_task_constructor_msgs::msg::SubTrajectory& t = msg.sub_trajectory.back();
 	SolutionBase::fillInfo(t.info, introspection);
 
 	if (trajectory())
@@ -176,8 +178,9 @@ void SolutionSequence::push_back(const SolutionBase& solution) {
 	subsolutions_.push_back(&solution);
 }
 
-void SolutionSequence::fillMessage(moveit_task_constructor_msgs::Solution& msg, Introspection* introspection) const {
-	moveit_task_constructor_msgs::SubSolution sub_msg;
+void SolutionSequence::fillMessage(moveit_task_constructor_msgs::msg::Solution& msg,
+                                   Introspection* introspection) const {
+	moveit_task_constructor_msgs::msg::SubSolution sub_msg;
 	SolutionBase::fillInfo(sub_msg.info, introspection);
 
 	// Usually subsolutions originate from another stage than this solution.
@@ -215,12 +218,12 @@ double SolutionSequence::computeCost(const CostTerm& f, std::string& comment) co
 	return f(*this, comment);
 }
 
-void WrappedSolution::fillMessage(moveit_task_constructor_msgs::Solution& solution,
+void WrappedSolution::fillMessage(moveit_task_constructor_msgs::msg::Solution& solution,
                                   Introspection* introspection) const {
 	wrapped_->fillMessage(solution, introspection);
 
 	// prepend this solutions info as a SubSolution msg
-	moveit_task_constructor_msgs::SubSolution sub_msg;
+	moveit_task_constructor_msgs::msg::SubSolution sub_msg;
 	SolutionBase::fillInfo(sub_msg.info, introspection);
 	sub_msg.sub_solution_id.push_back(introspection ? introspection->solutionId(*wrapped_) : 0);
 	solution.sub_solution.insert(solution.sub_solution.begin(), std::move(sub_msg));

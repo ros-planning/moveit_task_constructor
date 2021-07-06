@@ -36,31 +36,31 @@
 
 #pragma once
 
-#include <moveit_task_constructor_msgs/Solution.h>
+#include <moveit_task_constructor_msgs/msg/solution.hpp>
 #include <moveit/macros/class_forward.h>
 
 namespace moveit {
 namespace core {
-MOVEIT_CLASS_FORWARD(RobotState)
+MOVEIT_CLASS_FORWARD(RobotState);
 }
 }  // namespace moveit
 namespace planning_scene {
-MOVEIT_CLASS_FORWARD(PlanningScene)
+MOVEIT_CLASS_FORWARD(PlanningScene);
 }
 namespace robot_trajectory {
-MOVEIT_CLASS_FORWARD(RobotTrajectory)
+MOVEIT_CLASS_FORWARD(RobotTrajectory);
 }
 namespace Ogre {
 class SceneNode;
 }
-namespace rviz {
+namespace rviz_common {
 class DisplayContext;
 }
 
 namespace moveit_rviz_plugin {
 
-MOVEIT_CLASS_FORWARD(DisplaySolution)
-MOVEIT_CLASS_FORWARD(MarkerVisualization)
+MOVEIT_CLASS_FORWARD(DisplaySolution);
+MOVEIT_CLASS_FORWARD(MarkerVisualization);
 
 /** Class representing a task solution for display */
 class DisplaySolution
@@ -125,7 +125,7 @@ public:
 	const MarkerVisualizationPtr markersOfSubTrajectory(size_t index) const { return data_.at(index).markers_; }
 
 	void setFromMessage(const planning_scene::PlanningScenePtr& start_scene,
-	                    const moveit_task_constructor_msgs::Solution& msg);
-	void fillMessage(moveit_task_constructor_msgs::Solution& msg) const;
+	                    const moveit_task_constructor_msgs::msg::Solution& msg);
+	void fillMessage(moveit_task_constructor_msgs::msg::Solution& msg) const;
 };
 }  // namespace moveit_rviz_plugin

@@ -44,7 +44,7 @@ namespace moveit {
 namespace task_constructor {
 namespace solvers {
 
-MOVEIT_CLASS_FORWARD(CartesianPath)
+MOVEIT_CLASS_FORWARD(CartesianPath);
 
 /** Use MoveIt's computeCartesianPath() to generate a straigh-line path between to scenes */
 class CartesianPath : public PlannerInterface
@@ -63,12 +63,12 @@ public:
 
 	bool plan(const planning_scene::PlanningSceneConstPtr& from, const planning_scene::PlanningSceneConstPtr& to,
 	          const moveit::core::JointModelGroup* jmg, double timeout, robot_trajectory::RobotTrajectoryPtr& result,
-	          const moveit_msgs::Constraints& path_constraints = moveit_msgs::Constraints()) override;
+	          const moveit_msgs::msg::Constraints& path_constraints = moveit_msgs::msg::Constraints()) override;
 
 	bool plan(const planning_scene::PlanningSceneConstPtr& from, const moveit::core::LinkModel& link,
 	          const Eigen::Isometry3d& target, const moveit::core::JointModelGroup* jmg, double timeout,
 	          robot_trajectory::RobotTrajectoryPtr& result,
-	          const moveit_msgs::Constraints& path_constraints = moveit_msgs::Constraints()) override;
+	          const moveit_msgs::msg::Constraints& path_constraints = moveit_msgs::msg::Constraints()) override;
 };
 }  // namespace solvers
 }  // namespace task_constructor

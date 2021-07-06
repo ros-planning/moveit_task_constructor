@@ -4,7 +4,7 @@
 
 namespace moveit {
 namespace core {
-MOVEIT_CLASS_FORWARD(RobotModel)
+MOVEIT_CLASS_FORWARD(RobotModel);
 }
 }  // namespace moveit
 
@@ -12,4 +12,3 @@ MOVEIT_CLASS_FORWARD(RobotModel)
 moveit::core::RobotModelPtr getModel();
 
 // load a model from robot_description
-moveit::core::RobotModelPtr loadModel();
