@@ -19,14 +19,14 @@ jobs:
             TARGET_CMAKE_ARGS: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_FLAGS="--coverage"
           - IMAGE: master-source
             CXXFLAGS: >-
-             -Werror -Wall -Wextra -Wwrite-strings -Wunreachable-code -Wpointer-arith -Wredundant-decls
-             -Wno-unused-parameter -Wno-unused-function -Wno-deprecated-copy -Wno-unused-but-set-parameter
+              -Werror -Wall -Wextra -Wwrite-strings -Wunreachable-code -Wpointer-arith -Wredundant-decls
+              -Wno-unused-parameter -Wno-unused-function -Wno-deprecated-copy -Wno-unused-but-set-parameter
           - IMAGE: noetic-source
             CXX: clang++
             CLANG_TIDY: true
             CXXFLAGS: >-
-             -Werror -Wall -Wextra -Wwrite-strings -Wunreachable-code -Wpointer-arith -Wredundant-decls
-             -Wno-unused-parameter -Wno-unused-function -Wno-deprecated-copy
+              -Werror -Wall -Wextra -Wwrite-strings -Wunreachable-code -Wpointer-arith -Wredundant-decls
+              -Wno-unused-parameter -Wno-unused-function -Wno-deprecated-copy
           - IMAGE: noetic-source
             NAME: asan
             DOCKER_RUN_OPTS: >-
@@ -49,6 +49,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
 
       - name: Cache ccache
         uses: pat-s/always-upload-cache@v2.1.3
@@ -67,7 +69,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: failure()
         with:
-          name: test-results
+          name: test-results-${{ matrix.env.IMAGE }}${{ matrix.env.NAME && '-' || ''}}${{ matrix.env.NAME }}
           path: ${{ env.BASEDIR }}/target_ws/**/test_results/**/*.xml
       - name: Collect coverage information
         uses: rhaschke/lcov-action@master

@@ -73,7 +73,7 @@ QModelIndex LocalTaskModel::index(Node* n) const {
 		return true;
 	};
 	parent->traverseChildren(find_row);
-	Q_ASSERT(row < parent->numChildren());
+	Q_ASSERT(row < (int)parent->numChildren());
 	return createIndex(row, 0, n);
 }
 
