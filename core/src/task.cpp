@@ -303,9 +303,17 @@ moveit::core::MoveItErrorCode Task::execute(const SolutionBase& s) {
 	}
 
 	auto result_future = ac->async_get_result(goal_handle);
-	if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::FutureReturnCode::SUCCESS) {
-		RCLCPP_ERROR(node->get_logger(), "Get result call failed");
-		return error_code;
+	while (result_future.wait_for(std::chrono::milliseconds(10)) != std::future_status::ready) {
+		if (pimpl()->preempt_requested_) {
+			auto cancel_future = ac->async_cancel_goal(goal_handle);
+			if (rclcpp::spin_until_future_complete(node, cancel_future) != rclcpp::FutureReturnCode::SUCCESS) {
+				RCLCPP_ERROR(node->get_logger(), "Could not preempt execution");
+				return error_code;
+			} else {
+				error_code.val = moveit_msgs::msg::MoveItErrorCodes::PREEMPTED;
+				return error_code;
+			}
+		}
 	}
 
 	auto result = result_future.get();

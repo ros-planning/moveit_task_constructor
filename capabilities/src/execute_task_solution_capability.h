@@ -75,6 +75,7 @@ private:
 	}
 
 	ActionServerType::SharedPtr as_;
+	rclcpp::CallbackGroup::SharedPtr action_callback_group_;
 };
 
 }  // namespace move_group
